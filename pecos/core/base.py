@@ -492,6 +492,7 @@ class corelib(object):
             if forced_rebuild:
                 check_output("make -C {} clean lib".format(dirname), shell=True)
             path_to_so = glob(os.path.join(dirname, soname) + "*.so")[0]
+            # print(path_to_so)
             _c_lib = CDLL(path_to_so)
         except BaseException:
             try:
@@ -503,6 +504,7 @@ class corelib(object):
         return _c_lib
 
     def __init__(self, dirname, soname, forced_rebuild=False):
+        # print("dirname, soname", dirname, soname)
         self.clib_float32 = corelib.load_dynamic_library(
             dirname, soname + "_float32", forced_rebuild=forced_rebuild
         )

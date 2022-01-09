@@ -791,7 +791,7 @@ class TransformerMatcher(pecos.BaseClass):
             sampler=SequentialSampler(data),
             pin_memory=False,
             batch_size=kwargs.get("batch_size", 8),
-            num_workers=batch_gen_workers,
+            num_workers=0,
         )
 
         local_topk = min(pred_params.only_topk, self.nr_labels)
@@ -991,8 +991,11 @@ class TransformerMatcher(pecos.BaseClass):
             sampler=RandomSampler(train_data),
             pin_memory=False,
             batch_size=train_params.batch_size,
-            num_workers=train_params.batch_gen_workers,
+            # num_workers=train_params.batch_gen_workers,
+            num_workers=0,
         )
+        # print("train_data", train_data)
+        # print("train_dataloader", train_dataloader)
 
         # compute stopping criteria
         if train_params.max_steps > 0:
@@ -1083,18 +1086,23 @@ class TransformerMatcher(pecos.BaseClass):
         self.text_encoder.zero_grad()
         self.text_model.zero_grad()
         for epoch in range(1, int(train_params.num_train_epochs) + 1):
+            LOGGER.info("Epoch %d", epoch)
             if do_resample and epoch > 1:  # redo subsample negative labels
+                LOGGER.info("here1")
                 label_indices_pt, label_values_pt = TransformerMatcher._get_label_tensors(
                     M_next,
                     prob.Y,
                     idx_padding=self.text_model.label_pad,
                     max_labels=train_params.max_active_matching_labels,
                 )
+                LOGGER.info("here2")
                 train_data.refresh_labels(
                     label_values=label_values_pt,
                     label_indices=label_indices_pt,
                 )
+            LOGGER.info("here3")
             for batch_cnt, batch in enumerate(train_dataloader):
+                # LOGGER.info("batch cnt %d", batch_cnt)
                 self.text_encoder.train()
                 self.text_model.train()
                 start_time = time.time()
