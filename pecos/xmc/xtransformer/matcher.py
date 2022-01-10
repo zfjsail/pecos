@@ -503,7 +503,7 @@ class TransformerMatcher(pecos.BaseClass):
                 feature_tensors = deepcopy(cur_f)
             else:
                 for k in cur_f:
-                    feature_tensors[k] = feature_tensors[k] + cur_f[k]
+                    feature_tensors[k] = torch.cat((feature_tensors[k], cur_f[k]), dim=0)
 
         LOGGER.info("***** Finished with time cost={} *****".format(time.time() - t_start))
         return feature_tensors
