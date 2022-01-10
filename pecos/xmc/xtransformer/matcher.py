@@ -14,6 +14,7 @@ import logging
 import os
 import tempfile
 import time
+from copy import deepcopy
 
 import dataclasses as dc
 import numpy as np
@@ -178,14 +179,14 @@ class TransformerMatcher(pecos.BaseClass):
             return self
 
     def __init__(
-        self,
-        text_encoder,
-        text_tokenizer,
-        text_model,
-        C=None,
-        concat_model=None,
-        train_params=None,
-        pred_params=None,
+            self,
+            text_encoder,
+            text_tokenizer,
+            text_model,
+            C=None,
+            concat_model=None,
+            train_params=None,
+            pred_params=None,
     ):
         """
         Args:
@@ -468,6 +469,12 @@ class TransformerMatcher(pecos.BaseClass):
                                     "token_type_ids": tensor of token type ids,
                                     }
         """
+
+        def chunks(lst, n):
+            """Yield successive n-sized chunks from lst."""
+            for i in range(0, len(lst), n):
+                yield lst[i:i + n]
+
         convert_kwargs = {
             "add_special_tokens": True,
             "padding": "max_length",
@@ -482,10 +489,21 @@ class TransformerMatcher(pecos.BaseClass):
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
         LOGGER.info("***** Encoding data len={} truncation={}*****".format(len(corpus), max_length))
         t_start = time.time()
-        feature_tensors = self.text_tokenizer.batch_encode_plus(
-            batch_text_or_text_pairs=corpus,
-            **convert_kwargs,
-        )
+
+        chunk_size = 100000
+        feature_tensors = {}
+        for c_i, c in enumerate(chunks(corpus, chunk_size)):
+            cur_f = self.text_tokenizer.batch_encode_plus(
+                batch_text_or_text_pairs=c,
+                **convert_kwargs,
+            )
+            LOGGER.info("c_i %d", c_i)
+            print("cur_f", cur_f)
+            if len(feature_tensors) == 0:
+                feature_tensors = deepcopy(cur_f)
+            else:
+                for k in cur_f:
+                    feature_tensors[k] = feature_tensors[k] + cur_f[k]
 
         LOGGER.info("***** Finished with time cost={} *****".format(time.time() - t_start))
         return feature_tensors
@@ -561,7 +579,7 @@ class TransformerMatcher(pecos.BaseClass):
 
         for i in range(nr_inst):
             offset = 0
-            neg_samples = M1.indices[M1.indptr[i] : M1.indptr[i + 1]]
+            neg_samples = M1.indices[M1.indptr[i]: M1.indptr[i + 1]]
             # fill with positive samples first
             if Y is not None:
                 y_nnz = Y.indptr[i + 1] - Y.indptr[i]
@@ -575,7 +593,7 @@ class TransformerMatcher(pecos.BaseClass):
                 # random sample negative labels
                 neg_samples = np.random.choice(neg_samples, max_labels - offset)
 
-            label_indices[i, offset : offset + neg_samples.size] = neg_samples
+            label_indices[i, offset: offset + neg_samples.size] = neg_samples
 
         label_indices = torch.IntTensor(label_indices)
 
@@ -629,12 +647,12 @@ class TransformerMatcher(pecos.BaseClass):
         return smat_util.sorted_csr(pred_csr_codes.astype(np.float32), only_topk=only_topk)
 
     def predict(
-        self,
-        X_text,
-        X_feat=None,
-        csr_codes=None,
-        pred_params=None,
-        **kwargs,
+            self,
+            X_text,
+            X_feat=None,
+            csr_codes=None,
+            pred_params=None,
+            **kwargs,
     ):
         """Predict with the transformer matcher, allow batch prediction to reduce memory cost
 
@@ -697,9 +715,9 @@ class TransformerMatcher(pecos.BaseClass):
             P_chunks = []
             for i in range(0, nr_inst, max_pred_chunk):
                 cur_P, cur_embedding = self._predict(
-                    {k: v[i : i + max_pred_chunk] for k, v in X_text.items()},
-                    X_feat=None if X_feat is None else X_feat[i : i + max_pred_chunk, :],
-                    csr_codes=None if csr_codes is None else csr_codes[i : i + max_pred_chunk, :],
+                    {k: v[i: i + max_pred_chunk] for k, v in X_text.items()},
+                    X_feat=None if X_feat is None else X_feat[i: i + max_pred_chunk, :],
+                    csr_codes=None if csr_codes is None else csr_codes[i: i + max_pred_chunk, :],
                     pred_params=pred_params,
                     **kwargs,
                 )
@@ -714,12 +732,12 @@ class TransformerMatcher(pecos.BaseClass):
         return label_pred, embeddings
 
     def _predict(
-        self,
-        X_text,
-        X_feat=None,
-        csr_codes=None,
-        pred_params=None,
-        **kwargs,
+            self,
+            X_text,
+            X_feat=None,
+            csr_codes=None,
+            pred_params=None,
+            **kwargs,
     ):
         """Predict with the transformer matcher
 
@@ -1248,11 +1266,11 @@ class TransformerMatcher(pecos.BaseClass):
                         LOGGER.info("-" * 89)
 
                 if (max_steps > 0 and global_step > max_steps) or (
-                    max_no_improve_cnt > 0 and no_improve_cnt >= max_no_improve_cnt
+                        max_no_improve_cnt > 0 and no_improve_cnt >= max_no_improve_cnt
                 ):
                     break
             if (max_steps > 0 and global_step > max_steps) or (
-                max_no_improve_cnt > 0 and no_improve_cnt >= max_no_improve_cnt
+                    max_no_improve_cnt > 0 and no_improve_cnt >= max_no_improve_cnt
             ):
                 break
 
@@ -1260,14 +1278,14 @@ class TransformerMatcher(pecos.BaseClass):
 
     @classmethod
     def train(
-        cls,
-        prob,
-        csr_codes=None,
-        val_prob=None,
-        val_csr_codes=None,
-        train_params=None,
-        pred_params=None,
-        **kwargs,
+            cls,
+            prob,
+            csr_codes=None,
+            val_prob=None,
+            val_csr_codes=None,
+            train_params=None,
+            pred_params=None,
+            **kwargs,
     ):
         """Train the transformer matcher
 
